@@ -25,9 +25,8 @@ import { logger } from "./log.js";
  * @returns {Promise<any>} The response from the fetcher function.
  */
 
-var retryer = /* @__PURE__ */ __name(async (fetcher5, variables, retries = 0) => {
-
-  const currentPATs = Object.keys(process.env).filter(
+var retryer = async (fetcher, variables, retries = 0) => {
+  const currentPATs = Object.keys(process.env || {}).filter(
     (key) => /PAT_\d*$/.exec(key)
   ).length;
 
@@ -35,7 +34,7 @@ var retryer = /* @__PURE__ */ __name(async (fetcher5, variables, retries = 0) =>
     throw new CustomError("No GitHub API tokens found", CustomError.NO_TOKENS);
   }
 
-  if (retries > RETRIES) {
+  if (retries >= currentPATs) {
     throw new CustomError(
       "Downtime due to GitHub API rate limiting",
       CustomError.MAX_RETRY,
@@ -60,16 +59,12 @@ var retryer = /* @__PURE__ */ __name(async (fetcher5, variables, retries = 0) =>
     const isRateLimited =
       (errors && errorType === "RATE_LIMITED") || /rate limit/i.test(errorMsg);
 
-    // if rate limit is hit increase the RETRIES and recursively call the retryer
-    // with username, and current RETRIES
     if (isRateLimited) {
-      logger.log(`PAT_${retries + 1} Failed`);
+      logger.log(`PAT_${retries + 1} Failed (Rate Limited)`);
       retries++;
-      // directly return from the function
       return retryer(fetcher, variables, retries);
     }
 
-    // finally return the response
     return response;
   } catch (err) {
     /** @type {any} */
@@ -80,12 +75,8 @@ var retryer = /* @__PURE__ */ __name(async (fetcher5, variables, retries = 0) =>
       throw e;
     }
 
-    // prettier-ignore
-    // also checking for bad credentials if any tokens gets invalidated
-    const isBadCredential =
-      e?.response?.data?.message === "Bad credentials";
-    const isAccountSuspended =
-      e?.response?.data?.message === "Sorry. Your account was suspended.";
+    const isBadCredential = e?.response?.data?.message === "Bad credentials";
+    const isAccountSuspended = e?.response?.data?.message === "Sorry. Your account was suspended.";
 
     if (isBadCredential || isAccountSuspended) {
       logger.log(`PAT_${retries + 1} Failed`);
@@ -97,7 +88,7 @@ var retryer = /* @__PURE__ */ __name(async (fetcher5, variables, retries = 0) =>
     // HTTP error with a response → return it for caller-side handling
     return e.response;
   }
-}, "retryer");
+};
 
-export { retryer, RETRIES };
+export { retryer };
 export default retryer;
