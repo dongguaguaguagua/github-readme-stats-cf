@@ -6,33 +6,45 @@ import topLangs from "../api/top-langs.js";
 import wakatime from "../api/wakatime.js";
 import gist from "../api/gist.js";
 
-// 调试
 export default {
-  async fetch(request, env, ctx) {
-    // 强制打印当前收到的所有环境变量名（不打印值，保护隐私）
-    const keys = Object.keys(env);
-    console.log("Worker Started. Available Env Keys:", JSON.stringify(keys));
+  /**
+   * Fetch handler for Cloudflare Worker.
+   *
+   * @param {Request} request The incoming request.
+   * @param {*} env The environment variables.
+   * @param {*} ctx The execution context.
+   * @returns {Promise<Response>} The response.
+   */
+  // eslint-disable-next-line no-unused-vars
+  async fetch(request2, env3, ctx) {
+    // 核心修复：在任何 import 的逻辑运行前，强制同步 env
+    globalThis.process = globalThis.process || {};
+    globalThis.process.env = {
+      ...globalThis.process.env,
+      ...env3,
+      NODE_ENV: "production"
+    };
 
-    // 检查是否有 PAT_ 开头的变量
-    const hasToken = keys.some(k => k.startsWith("PAT_"));
-    if (!hasToken) {
-      return new Response("Error: No PAT_ tokens found in Environment Variables!", { status: 500 });
-    }
+    const url = new URL(request2.url);
+    const path = url.pathname;
 
-    // 强制同步
-    globalThis.process = { env: { ...env, NODE_ENV: "production" } };
+    // 打印日志，方便你在 Cloudflare 后台查看
+    console.log(`Path: ${path}, Username: ${url.searchParams.get("username")}`);
 
-    try {
-      // 这里的 api_default 等需要确保你代码里有 import
-      const url = new URL(request.url);
-      if (url.pathname === "/api") {
-        // 直接尝试最核心的逻辑
-        return workerAdapter(request, api_default);
-      }
-      return new Response("Not Found", { status: 404 });
-    } catch (e) {
-      console.log("Fatal Error:", e.message);
-      return new Response(e.message, { status: 500 });
+    switch (path) {
+      case "/api":
+      case "/api/index":
+        return workerAdapter(request2, api_default);
+      case "/api/pin":
+        return workerAdapter(request2, pin_default);
+      case "/api/top-langs":
+        return workerAdapter(request2, top_langs_default);
+      case "/api/wakatime":
+        return workerAdapter(request2, wakatime_default);
+      case "/api/gist":
+        return workerAdapter(request2, gist_default);
+      default:
+        return new Response("Not Found", { status: 404 });
     }
   }
 };
