@@ -97,7 +97,7 @@ var retryer = /* @__PURE__ */ __name(async (fetcher5, variables, retries = 0) =>
     // HTTP error with a response → return it for caller-side handling
     return e.response;
   }
-};
+}, "retryer");
 
 export { retryer, RETRIES };
 export default retryer;
